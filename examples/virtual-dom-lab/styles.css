@@ -145,8 +145,24 @@ h3 {
 }
 
 .test-action-row {
+  margin: 0;
+}
+
+.frame-offset-stack {
+  display: grid;
+  gap: 12px;
   margin-top: 14px;
-  margin-bottom: 12px;
+  min-height: 98px;
+}
+
+.frame-offset-copy {
+  align-content: start;
+}
+
+.frame-offset-text {
+  min-height: 46px;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .meta-row,
@@ -156,6 +172,22 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.control-placeholder {
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(159, 184, 207, 0.05);
+  border: 1px solid rgba(159, 184, 207, 0.08);
+  opacity: 0;
+}
+
+.control-placeholder-primary {
+  min-height: 46px;
+}
+
+.control-placeholder-secondary {
+  min-height: 40px;
 }
 
 .meta-chip,
@@ -326,6 +358,12 @@ button:disabled {
   padding: 22px;
 }
 
+.inspector-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 240px;
+}
+
 .scene-frame {
   margin-top: 16px;
   padding: 16px;
@@ -339,12 +377,14 @@ button:disabled {
 
 .scene-host {
   min-height: 426px;
+  height: 426px;
   border-radius: 20px;
   padding: 18px;
   background:
     radial-gradient(circle at top, rgba(116, 231, 255, 0.08), transparent 46%),
     linear-gradient(180deg, rgba(12, 31, 48, 0.92), rgba(10, 21, 35, 0.96));
   overflow: auto;
+  display: flex;
 }
 
 .scene-host > * {
@@ -377,8 +417,13 @@ button:disabled {
 
 .scene-root {
   display: grid;
+  align-content: start;
   gap: 18px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   padding: 22px;
+  box-sizing: border-box;
   border: 1px solid rgba(116, 231, 255, 0.16);
   border-radius: 24px;
   background:
@@ -472,6 +517,7 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  margin-top: auto;
 }
 
 .scene-root .scene-cta {
@@ -541,6 +587,15 @@ button:disabled {
   margin: 16px 0 0;
   padding: 0;
   list-style: none;
+}
+
+#patch-list,
+#dom-op-list,
+#mutation-list {
+  min-height: 0;
+  max-height: 180px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .event-item,

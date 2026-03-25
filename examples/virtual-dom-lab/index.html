@@ -69,10 +69,13 @@
                 </div>
                 <span id="actual-chip" class="state-chip">기준 상태</span>
               </div>
-              <p class="panel-description">
-                Patch 버튼을 누르기 전까지는 실제 브라우저 DOM이 유지됩니다. 변경된 노드만 강조
-                표시됩니다.
-              </p>
+              <div class="frame-offset-stack frame-offset-copy">
+                <p class="frame-offset-text">
+                  Patch 버튼을 누르기 전까지는 실제 브라우저 DOM이 유지 됩니다. 변경된 노드만 강조
+                  표시됩니다.
+                </p>
+                <div class="control-placeholder control-placeholder-secondary" aria-hidden="true"></div>
+              </div>
               <div class="scene-frame">
                 <div id="actual-host" class="scene-host actual-host" aria-label="실제 영역"></div>
               </div>
@@ -86,25 +89,22 @@
                 </div>
                 <span id="selection-chip" class="state-chip subtle">선택 없음</span>
               </div>
-              <div class="action-row test-action-row">
-                <button id="patch-button" class="primary-button" type="button">Patch</button>
-                <button id="undo-button" class="ghost-button" type="button">뒤로</button>
-                <button id="redo-button" class="ghost-button" type="button">앞으로</button>
-                <button id="reset-button" class="ghost-button" type="button">샘플 복원</button>
-              </div>
-              <div class="toolbar" role="toolbar" aria-label="테스트 영역 구조 조작">
-                <button id="add-child-button" class="tool-button" type="button">자식 추가</button>
-                <button id="replace-tag-button" class="tool-button" type="button">태그 교체</button>
-                <button id="delete-node-button" class="tool-button danger" type="button">노드 삭제</button>
+              <div class="frame-offset-stack">
+                <div class="action-row test-action-row">
+                  <button id="patch-button" class="primary-button" type="button">Patch</button>
+                  <button id="undo-button" class="ghost-button" type="button">뒤로</button>
+                  <button id="redo-button" class="ghost-button" type="button">앞으로</button>
+                  <button id="reset-button" class="ghost-button" type="button">샘플 복원</button>
+                </div>
+                <div class="toolbar" role="toolbar" aria-label="테스트 영역 구조 조작">
+                  <button id="add-child-button" class="tool-button" type="button">자식 추가</button>
+                  <button id="replace-tag-button" class="tool-button" type="button">태그 교체</button>
+                  <button id="delete-node-button" class="tool-button danger" type="button">노드 삭제</button>
+                </div>
               </div>
 
               <div class="scene-frame">
                 <div id="test-host" class="scene-host test-host" aria-label="테스트 영역"></div>
-              </div>
-
-              <div class="hint-strip">
-                <span>팁: 텍스트를 클릭해 바로 고칠 수 있습니다.</span>
-                <span>노드를 클릭하면 선택되고 툴바가 그 노드에 작동합니다.</span>
               </div>
             </section>
           </div>

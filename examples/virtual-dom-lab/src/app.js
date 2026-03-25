@@ -4,12 +4,8 @@ const SAMPLE_HTML = `
   <article class="scene-root" data-tone="calm">
     <header>
       <span class="demo-eyebrow">Virtual DOM Lab</span>
-      <h3>같은 화면을 두 번 그리지 않고, 필요한 부분만 바꾸는 연습</h3>
+      <h3>Actual DOM</h3>
     </header>
-    <p>
-      React는 상태가 바뀔 때 새 Virtual DOM 스냅샷을 만들고, 이전 스냅샷과 비교한 뒤 실제 DOM에
-      필요한 변경만 반영합니다.
-    </p>
     <section class="summary-grid">
       <div>
         <strong>Document</strong>
@@ -24,24 +20,8 @@ const SAMPLE_HTML = `
         <span>변경된 부분만 DOM 반영</span>
       </div>
     </section>
-    <section class="callout">
-      <p>
-        오른쪽 테스트 영역에서 이 문장이나 구조를 바꾼 뒤 Patch를 누르면, 왼쪽 실제 영역은 전체가
-        아니라 필요한 노드만 바뀝니다.
-      </p>
-    </section>
-    <ul class="feature-list">
-      <li><strong>Read:</strong> 브라우저 DOM을 Virtual DOM으로 변환</li>
-      <li><strong>Diff:</strong> 이전 스냅샷과 현재 스냅샷 비교</li>
-      <li><strong>Commit:</strong> 변경된 노드만 실제 DOM에 반영</li>
-    </ul>
     <footer class="action-stack">
       <button type="button" class="scene-cta">Actual DOM은 Patch 전까지 유지</button>
-      <div class="action-note">
-        <span>Diff 5 cases</span>
-        <span>CSR only</span>
-        <span>Vanilla JS</span>
-      </div>
     </footer>
   </article>
 `;
