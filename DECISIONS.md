@@ -14,7 +14,8 @@
 이번 단계에서 포함하는 것:
 
 - JSX 없이 동작하는 mini-react 코어
-- Virtual DOM type 3개
+- Virtual DOM node category 3개
+- Virtual DOM shape 4개 필드
 - Patch type 5개
 - 실제 DOM 반영 로직
 - `key` 기반 자식 매칭
@@ -44,9 +45,51 @@
 
 ## Core Data Model
 
-### Virtual DOM Types
+### Virtual DOM Shape
 
-우리는 Virtual DOM node type을 아래 3개로 고정합니다.
+우리 프로젝트에서 VNode는 아래 필드를 가지는 객체로 통일합니다.
+
+- `nodeType`
+- `type`
+- `props`
+- `children`
+
+설명:
+
+- `nodeType`
+  - 이 VNode가 어떤 분류인지 나타냅니다.
+  - 예: `ELEMENT`, `TEXT`, `COMPONENT`
+
+- `type`
+  - 실제 태그 이름 또는 컴포넌트 함수를 나타냅니다.
+  - 예: `"div"`, `"button"`, `MyComponent`
+
+- `props`
+  - 속성 정보를 담습니다.
+  - 예: `{ id: "app", className: "box", key: "todo-1" }`
+
+- `children`
+  - 자식 VNode 배열입니다.
+
+예시:
+
+```js
+{
+  nodeType: "ELEMENT",
+  type: "div",
+  props: { id: "app" },
+  children: []
+}
+```
+
+주의:
+
+- `type / props / children`은 VNode의 구조입니다.
+- `ELEMENT / TEXT / COMPONENT`는 VNode의 종류입니다.
+
+### Virtual DOM Node Categories
+
+우리는 VNode의 분류를 아래 3개로 고정합니다.
 
 - `ELEMENT`
 - `TEXT`
@@ -57,6 +100,54 @@
 - `ELEMENT`: 일반 HTML 태그 노드
 - `TEXT`: 텍스트 노드
 - `COMPONENT`: 함수형 컴포넌트 같은 추상 노드
+
+예시:
+
+#### 1. ELEMENT 예시
+
+```js
+{
+  nodeType: "ELEMENT",
+  type: "button",
+  props: { type: "button", className: "primary" },
+  children: [
+    {
+      nodeType: "TEXT",
+      type: "TEXT_ELEMENT",
+      props: { nodeValue: "저장" },
+      children: []
+    }
+  ]
+}
+```
+
+#### 2. TEXT 예시
+
+```js
+{
+  nodeType: "TEXT",
+  type: "TEXT_ELEMENT",
+  props: { nodeValue: "Count: 1" },
+  children: []
+}
+```
+
+#### 3. COMPONENT 예시
+
+```js
+{
+  nodeType: "COMPONENT",
+  type: Counter,
+  props: { count: 1 },
+  children: []
+}
+```
+
+포인트:
+
+- `ELEMENT`일 때 `type`은 보통 `"div"`, `"button"` 같은 태그 문자열입니다.
+- `TEXT`일 때 `type`은 보조 식별자이고, 실제 값은 `props.nodeValue`에 들어갑니다.
+- `COMPONENT`일 때 `type`은 태그명이 아니라 함수 참조입니다.
 
 ### Patch Types
 
@@ -175,6 +266,8 @@ h("li", { key: "todo-1" }, "첫 번째 아이템")
 
 - 팀원이 파일을 수정할 때는 다른 사람이 맡은 책임 영역을 침범하지 않도록 합니다.
 - 모호한 용어는 README나 이 문서에 추가합니다.
+- 문서만 전담하는 역할은 두지 않습니다.
+- 모든 팀원은 코어 코드 1개 이상과 검증 또는 설명 책임 1개 이상을 함께 맡습니다.
 
 ## Suggested Role Split For 4 People
 
@@ -184,30 +277,38 @@ h("li", { key: "todo-1" }, "첫 번째 아이템")
 
 - `A`
   - 목적: Virtual DOM node의 형태와 생성 규칙을 고정합니다.
-  - 개발 목표: `h()`가 일관된 VNode를 만들고, `ELEMENT / TEXT / COMPONENT` 기준이 프로젝트 전체에서 흔들리지 않게 합니다.
+  - 개발 목표: `h()`가 일관된 VNode shape를 만들고, `ELEMENT / TEXT / COMPONENT` 분류 기준이 프로젝트 전체에서 흔들리지 않게 하며 관련 테스트까지 검증합니다.
   - `src/h.js`
   - `src/constants.js`
+  - `test/h.test.js`
 
 - `B`
   - 목적: 이전 VDOM과 새 VDOM을 비교해서 patch를 올바르게 계산합니다.
-  - 개발 목표: patch type 5개와 key 정책이 정확히 반영된 `diff()`를 구현합니다.
+  - 개발 목표: patch type 5개와 key 정책이 정확히 반영된 `diff()`를 구현하고 관련 테스트까지 검증합니다.
   - `src/diff.js`
+  - `test/diff.test.js`
 
 - `C`
-  - 목적: diff 결과를 실제 DOM에 안전하게 반영하고 전체 렌더 흐름을 연결합니다.
-  - 개발 목표: `commit`, `render`, DOM helper가 함께 동작해서 patch가 실제 화면 변경으로 이어지게 만듭니다.
+  - 목적: diff 결과를 실제 DOM에 안전하게 반영하는 commit 계층을 구현합니다.
+  - 개발 목표: patch가 실제 DOM 노드의 생성, 제거, 교체로 정확히 이어지게 만들고 관련 테스트까지 검증합니다.
   - `src/commit.js`
-  - `src/render.js`
   - `src/path.js`
-  - `src/dom-props.js`
+  - `test/render.test.js`
 
 - `D`
-  - 목적: 사용자가 우리 엔진의 동작을 이해할 수 있도록 데모, 테스트, 문서를 관리합니다.
-  - 개발 목표: `examples/`에서 상태 변화와 diff 결과를 보여주고, `test/`와 문서로 팀 이해를 돕습니다.
+  - 목적: render 흐름과 DOM prop 처리를 연결하고, 데모를 통해 팀과 사용자가 전체 동작을 이해할 수 있게 합니다.
+  - 개발 목표: `render`와 `dom-props`를 안정화하고, `examples/`에서 상태 변화와 diff 결과를 이해할 수 있게 보여줍니다.
+  - `src/render.js`
+  - `src/dom-props.js`
   - `examples/`
-  - `test/`
-  - `README.md`
-  - `DECISIONS.md`
+
+- `README.md`
+  - 공통 문서
+  - 각자 자기 담당 영역 설명을 필요할 때 업데이트합니다.
+
+- `DECISIONS.md`
+  - 공통 합의 문서
+  - 팀 합의가 생길 때만 함께 업데이트합니다.
 
 주의:
 
@@ -221,18 +322,22 @@ h("li", { key: "todo-1" }, "첫 번째 아이템")
 
 - `src/h.js`
 - `src/constants.js`
+- `test/h.test.js`
 
 주요 책임:
 
 - VNode shape 고정
-- `ELEMENT / TEXT / COMPONENT` 규칙 유지
+- `nodeType / type / props / children` 구조 유지
+- `ELEMENT / TEXT / COMPONENT` 분류 규칙 유지
 - child normalization 정리
+- `h()` 관련 테스트 작성 및 유지
 
 ### 2. Diff / Key
 
 담당 파일 예시:
 
 - `src/diff.js`
+- `test/diff.test.js`
 
 주요 책임:
 
@@ -240,43 +345,45 @@ h("li", { key: "todo-1" }, "첫 번째 아이템")
 - key 정책 구현
 - key fallback 정책 반영
 - 중복 key 경고 처리
+- diff 관련 테스트 작성 및 유지
 
 ### 3. Commit / Render
 
 담당 파일 예시:
 
 - `src/commit.js`
-- `src/render.js`
-- `src/dom-props.js`
 - `src/path.js`
+- `test/render.test.js`
 
 주요 책임:
 
 - patch를 실제 DOM에 반영
-- render / commit 흐름 관리
-- DOM helper 보강
+- DOM 노드 위치 탐색
+- commit 동작 안정화
+- commit 관련 테스트 작성 및 유지
 
-### 4. Demo / Tests / Docs
+### 4. Render / Demo
 
 담당 파일 예시:
 
+- `src/render.js`
+- `src/dom-props.js`
 - `examples/`
-- `test/`
-- `README.md`
-- `DECISIONS.md`
 
 주요 책임:
 
+- render 흐름 조정
+- DOM prop 처리 규칙 정리
 - 학습용 시각화 페이지
 - key 비교 시나리오 데모
-- 테스트 보강
-- 문서 업데이트
+- 데모 사용 흐름 정리
 
 ## Definition of Done For This Phase
 
 이번 단계가 끝났다고 볼 기준:
 
-- `src/`에서 Virtual DOM type 3개가 일관되게 사용된다.
+- `src/`에서 VNode shape가 일관되게 사용된다.
+- `src/`에서 Virtual DOM node category 3개가 일관되게 사용된다.
 - patch type 5개가 일관되게 사용된다.
 - `key`가 `props.key`로 동작한다.
 - key가 없으면 index 기준 fallback이 동작한다.

@@ -4,7 +4,12 @@ JSX 없이 Virtual DOM과 diff/commit 흐름을 학습하고 구현하기 위한
 
 ## Current Assumptions
 
-- Virtual DOM type 3개
+- VNode shape 필드
+  - `nodeType`
+  - `type`
+  - `props`
+  - `children`
+- Virtual DOM node category 3개
   - `ELEMENT`
   - `TEXT`
   - `COMPONENT`
