@@ -49,13 +49,11 @@ const SAMPLE_HTML = `
 const refs = {
   actualHost: document.getElementById("actual-host"),
   testHost: document.getElementById("test-host"),
-  statusLine: document.getElementById("status-line"),
   actualChip: document.getElementById("actual-chip"),
   selectionChip: document.getElementById("selection-chip"),
   historyChip: document.getElementById("history-chip"),
   liveDiffChip: document.getElementById("live-diff-chip"),
   patchCountChip: document.getElementById("patch-count-chip"),
-  impactBadge: document.getElementById("impact-badge"),
   previousTree: document.getElementById("previous-tree"),
   currentTree: document.getElementById("current-tree"),
   patchList: document.getElementById("patch-list"),
@@ -71,7 +69,6 @@ const refs = {
   redoButton: document.getElementById("redo-button"),
   resetButton: document.getElementById("reset-button"),
   addChildButton: document.getElementById("add-child-button"),
-  toggleAttrButton: document.getElementById("toggle-attr-button"),
   replaceTagButton: document.getElementById("replace-tag-button"),
   deleteNodeButton: document.getElementById("delete-node-button"),
 };
@@ -128,7 +125,6 @@ function bindEvents() {
   refs.resetButton.addEventListener("click", handleReset);
 
   refs.addChildButton.addEventListener("click", handleAddChild);
-  refs.toggleAttrButton.addEventListener("click", handleToggleAttribute);
   refs.replaceTagButton.addEventListener("click", handleReplaceTag);
   refs.deleteNodeButton.addEventListener("click", handleDeleteNode);
 
@@ -207,7 +203,7 @@ function syncDerivedState() {
 
 function renderAll() {
   renderTree(refs.previousTree, state.previousVNode);
-  renderTree(refs.currentTree, state.liveVNode);
+  renderTree(refs.currentTree, state.liveVNode, state.stagedPatches);
   renderPatchList();
   renderDomOps();
   renderMutationLog();
@@ -234,10 +230,6 @@ function renderChips() {
   refs.selectionChip.textContent = state.selectedNode
     ? `선택: <${state.selectedNode.tagName.toLowerCase()}>`
     : "선택 없음";
-
-  const impact = describeImpact(analyzePaintImpact(state.stagedPatches));
-  refs.impactBadge.textContent = impact.label;
-  refs.impactBadge.className = `impact-badge ${impact.className}`;
 }
 
 function renderButtons() {
@@ -248,7 +240,6 @@ function renderButtons() {
   refs.undoButton.disabled = state.pointer === 0;
   refs.redoButton.disabled = state.pointer >= state.history.length - 1;
   refs.addChildButton.disabled = !hasSelection;
-  refs.toggleAttrButton.disabled = !hasSelection;
   refs.replaceTagButton.disabled = !hasSelection;
   refs.deleteNodeButton.disabled = !canDeleteSelection;
 }
@@ -309,7 +300,7 @@ function renderHistory() {
   });
 }
 
-function renderTree(container, vnode) {
+function renderTree(container, vnode, patches = []) {
   container.replaceChildren();
 
   if (!vnode) {
@@ -317,11 +308,16 @@ function renderTree(container, vnode) {
     return;
   }
 
+  const changedPaths = new Set(getChangedTreePaths(patches).map(serializeTreePath));
   const rows = flattenVNode(vnode);
   rows.forEach((row) => {
     const rowEl = document.createElement("div");
     rowEl.className = "tree-row";
     rowEl.style.setProperty("--depth", String(row.depth));
+
+    if (changedPaths.has(serializeTreePath(row.path))) {
+      rowEl.classList.add("is-changed");
+    }
 
     const kind = document.createElement("span");
     kind.className = "tree-kind";
@@ -336,12 +332,13 @@ function renderTree(container, vnode) {
   });
 }
 
-function flattenVNode(vnode, depth = 0, rows = []) {
+function flattenVNode(vnode, depth = 0, rows = [], path = []) {
   if (vnode.kind === "text") {
     rows.push({
       depth,
       kind: "text",
       label: JSON.stringify(vnode.text),
+      path: [...path],
     });
     return rows;
   }
@@ -353,9 +350,12 @@ function flattenVNode(vnode, depth = 0, rows = []) {
     depth,
     kind: "node",
     label: `<${vnode.tagName}${attrs ? ` ${attrs}` : ""}>`,
+    path: [...path],
   });
 
-  (vnode.children || []).forEach((child) => flattenVNode(child, depth + 1, rows));
+  (vnode.children || []).forEach((child, index) =>
+    flattenVNode(child, depth + 1, rows, [...path, index])
+  );
   return rows;
 }
 
@@ -527,24 +527,6 @@ function handleAddChild() {
   scheduleRefresh();
 }
 
-function handleToggleAttribute() {
-  if (!state.selectedNode) return;
-
-  const active = state.selectedNode.getAttribute("data-importance") === "high";
-  if (active) {
-    state.selectedNode.removeAttribute("data-importance");
-  } else {
-    state.selectedNode.setAttribute("data-importance", "high");
-  }
-
-  setStatus(
-    active
-      ? `선택한 <${state.selectedNode.tagName.toLowerCase()}>의 강조 속성을 제거했습니다.`
-      : `선택한 <${state.selectedNode.tagName.toLowerCase()}>에 강조 속성을 추가했습니다.`
-  );
-  scheduleRefresh();
-}
-
 function handleReplaceTag() {
   if (!state.selectedNode) return;
 
@@ -633,31 +615,15 @@ function analyzePaintImpact(patches) {
 
 function describeImpact(level) {
   if (level === "high") {
-    return {
-      className: "impact-high",
-      shortLabel: "Reflow 가능성 높음",
-      label: "이번 Patch는 구조 변경이 있어 Reflow + Repaint 가능성이 큽니다.",
-    };
+    return { shortLabel: "Reflow 가능성 높음" };
   }
   if (level === "medium") {
-    return {
-      className: "impact-medium",
-      shortLabel: "Layout 체크 필요",
-      label: "이번 Patch는 텍스트/스타일 변경이 있어 레이아웃 재계산 가능성이 있습니다.",
-    };
+    return { shortLabel: "Layout 체크 필요" };
   }
   if (level === "low") {
-    return {
-      className: "impact-low",
-      shortLabel: "속성 중심",
-      label: "이번 Patch는 비교적 작은 속성 중심 변경입니다.",
-    };
+    return { shortLabel: "속성 중심" };
   }
-  return {
-    className: "impact-idle",
-    shortLabel: "대기 중",
-    label: "Patch 대기 중입니다.",
-  };
+  return { shortLabel: "대기 중" };
 }
 
 function renderEventItem(title, detail) {
@@ -733,7 +699,21 @@ function makeHistoryEntry(stateName, summary, vnode, patches, patchSummary) {
 }
 
 function setStatus(message) {
-  refs.statusLine.textContent = message;
+  return message;
+}
+
+function getChangedTreePaths(patches) {
+  return patches.map((patch) => {
+    if (patch.type === "CREATE") {
+      return [...(patch.path || []), patch.index];
+    }
+
+    return [...(patch.path || [])];
+  });
+}
+
+function serializeTreePath(path) {
+  return path.join(".");
 }
 
 function logMutation(entry) {
@@ -849,7 +829,6 @@ function exposeDebugHelpers() {
     runScenario: runDemoScenario,
   };
 }
-
 
 
 
