@@ -48,7 +48,9 @@ export function applyPatch(rootNode, patch, container) {
 
   if (patch.type === PATCH_TYPES.UPDATE_PROP) {
     const target = getNodeByPath(rootNode, patch.path);
-    updateProps(target, { [patch.key]: patch.oldValue }, { [patch.key]: patch.newValue });
+    const nextProps =
+      patch.newValue === undefined ? {} : { [patch.key]: patch.newValue };
+    updateProps(target, { [patch.key]: patch.oldValue }, nextProps);
     return rootNode;
   }
 

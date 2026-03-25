@@ -1,4 +1,9 @@
 export function setProp(domNode, key, value) {
+  if (value == null) {
+    removeProp(domNode, key);
+    return;
+  }
+
   if (key === "className") {
     domNode.className = value;
     return;
@@ -6,11 +11,6 @@ export function setProp(domNode, key, value) {
 
   if (key === "nodeValue") {
     domNode.nodeValue = value;
-    return;
-  }
-
-  if (value == null) {
-    domNode.removeAttribute(key);
     return;
   }
 
