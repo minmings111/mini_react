@@ -1,4 +1,13 @@
-﻿import { applyPatches, cloneVNode, createDomFromVNode, diff, domToVNode } from "./mini-vdom.js";
+import {
+  applyPatch,
+  createTextVNode,
+  diff,
+  PATCH_TYPES,
+  VNODE_TYPES,
+} from "../../../src/index.js";
+
+const INTERNAL_ATTR_PREFIX = "data-lab-";
+const INTERNAL_ATTRS = new Set(["contenteditable", "spellcheck"]);
 
 const SAMPLE_HTML = `
   <article class="scene-root" data-tone="calm">
@@ -103,9 +112,243 @@ function initialize() {
   setupMutationObserver();
   syncDerivedState();
   renderAll();
-  setStatus("실제 DOM을 읽어 Virtual DOM으로 만들고, 그 스냅샷으로 테스트 영역을 렌더링했습니다.");
+  setStatus("src/index.js 기반 diff와 commit으로 현재 데모를 연결했습니다.");
   playPipeline(["read", "diff"]);
   exposeDebugHelpers();
+}
+
+function isIgnorableAttr(name) {
+  const lower = name.toLowerCase();
+  return lower.startsWith(INTERNAL_ATTR_PREFIX) || INTERNAL_ATTRS.has(lower);
+}
+
+function cloneProps(props = {}) {
+  return Object.keys(props).reduce((next, key) => {
+    next[key] = props[key];
+    return next;
+  }, {});
+}
+
+function cloneVNode(vnode) {
+  if (!vnode) return null;
+
+  return {
+    nodeType: vnode.nodeType,
+    type: vnode.type,
+    props: cloneProps(vnode.props),
+    children: (vnode.children || []).map(cloneVNode),
+  };
+}
+
+function domToVNode(node) {
+  if (!node) return null;
+
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = node.textContent ?? "";
+    if (!text.trim()) return null;
+    return createTextVNode(text);
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return null;
+  }
+
+  const props = {};
+  const attrNames = node.getAttributeNames().sort();
+  for (const name of attrNames) {
+    if (isIgnorableAttr(name)) continue;
+    props[name === "class" ? "className" : name] = node.getAttribute(name) ?? "";
+  }
+
+  const children = [];
+  for (const childNode of node.childNodes) {
+    const childVNode = domToVNode(childNode);
+    if (childVNode) children.push(childVNode);
+  }
+
+  return {
+    nodeType: VNODE_TYPES.ELEMENT,
+    type: node.tagName.toLowerCase(),
+    props,
+    children,
+  };
+}
+
+function setDomProp(node, key, value) {
+  if (key === "key") {
+    return;
+  }
+
+  if (value == null) {
+    if (key === "className") {
+      node.className = "";
+      return;
+    }
+    node.removeAttribute(key);
+    return;
+  }
+
+  if (key === "className") {
+    node.className = value;
+    return;
+  }
+
+  if (key === "nodeValue") {
+    node.nodeValue = value;
+    return;
+  }
+
+  node.setAttribute(key, value);
+}
+
+function createDomFromVNode(vnode, doc = document) {
+  if (!vnode) return null;
+
+  if (vnode.nodeType === VNODE_TYPES.TEXT) {
+    return doc.createTextNode(vnode.props?.nodeValue ?? "");
+  }
+
+  const element = doc.createElement(vnode.type);
+  for (const [key, value] of Object.entries(vnode.props || {})) {
+    setDomProp(element, key, value);
+  }
+
+  for (const child of vnode.children || []) {
+    const childNode = createDomFromVNode(child, doc);
+    if (childNode) element.appendChild(childNode);
+  }
+
+  return element;
+}
+
+function getPathIndexes(path) {
+  if (path === "root") {
+    return [];
+  }
+
+  return [...path.matchAll(/children\[(\d+)\]/g)].map((match) =>
+    Number(match[1])
+  );
+}
+
+function getNodeByPath(rootNode, path) {
+  if (path === "root") {
+    return rootNode;
+  }
+
+  let current = rootNode;
+  for (const index of getPathIndexes(path)) {
+    if (!current?.childNodes || current.childNodes[index] == null) {
+      return null;
+    }
+    current = current.childNodes[index];
+  }
+
+  return current;
+}
+
+function getParentPath(path) {
+  if (path === "root") {
+    return null;
+  }
+
+  return path.replace(/\.children\[\d+\]$/, "");
+}
+
+function pushTouchedNode(touchedNodes, touchedSet, node) {
+  if (!node) return;
+  const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  if (!element || touchedSet.has(element)) return;
+  touchedSet.add(element);
+  touchedNodes.push(element);
+}
+
+function describeNodeLabel(vnode) {
+  if (!vnode) return "null";
+  if (vnode.nodeType === VNODE_TYPES.TEXT) return "text";
+  return String(vnode.type);
+}
+
+function applyCorePatches(rootNode, patches, container) {
+  let currentRoot = rootNode;
+  const operations = [];
+  const touchedNodes = [];
+  const touchedSet = new Set();
+
+  patches.forEach((patch) => {
+    const targetBefore = getNodeByPath(currentRoot, patch.path);
+    const parentBefore =
+      patch.type === PATCH_TYPES.CREATE
+        ? getNodeByPath(currentRoot, getParentPath(patch.path))
+        : targetBefore?.parentElement;
+
+    currentRoot = applyPatch(currentRoot, patch, container);
+
+    if (patch.type === PATCH_TYPES.CREATE) {
+      const createdNode = getNodeByPath(currentRoot, patch.path);
+      pushTouchedNode(touchedNodes, touchedSet, parentBefore);
+      pushTouchedNode(touchedNodes, touchedSet, createdNode);
+      operations.push({
+        api: "insertBefore",
+        path: patch.path,
+        detail: `path ${patch.path}에 <${describeNodeLabel(patch.node)}>를 생성했습니다.`,
+      });
+      return;
+    }
+
+    if (patch.type === PATCH_TYPES.REMOVE) {
+      pushTouchedNode(touchedNodes, touchedSet, targetBefore);
+      pushTouchedNode(touchedNodes, touchedSet, parentBefore);
+      operations.push({
+        api: "removeChild",
+        path: patch.path,
+        detail: `path ${patch.path} 노드를 제거했습니다.`,
+      });
+      return;
+    }
+
+    if (patch.type === PATCH_TYPES.REPLACE) {
+      const nextNode = getNodeByPath(currentRoot, patch.path);
+      pushTouchedNode(touchedNodes, touchedSet, targetBefore);
+      pushTouchedNode(touchedNodes, touchedSet, nextNode);
+      operations.push({
+        api: "replaceChild",
+        path: patch.path,
+        detail: `path ${patch.path} 노드를 <${describeNodeLabel(patch.newNode)}>로 교체했습니다.`,
+      });
+      return;
+    }
+
+    if (patch.type === PATCH_TYPES.UPDATE_PROP) {
+      const target = getNodeByPath(currentRoot, patch.path);
+      pushTouchedNode(touchedNodes, touchedSet, target);
+      operations.push({
+        api: patch.newValue === undefined ? "removeAttribute" : "setAttribute",
+        path: patch.path,
+        detail:
+          patch.newValue === undefined
+            ? `path ${patch.path}에서 ${patch.key} 속성을 제거했습니다.`
+            : `path ${patch.path}에서 ${patch.key}="${patch.newValue}"로 속성을 변경했습니다.`,
+      });
+      return;
+    }
+
+    if (patch.type === PATCH_TYPES.UPDATE_TEXT) {
+      const target = getNodeByPath(currentRoot, patch.path);
+      pushTouchedNode(touchedNodes, touchedSet, target);
+      operations.push({
+        api: "nodeValue",
+        path: patch.path,
+        detail: `path ${patch.path} 텍스트를 ${JSON.stringify(patch.newValue)}로 변경했습니다.`,
+      });
+    }
+  });
+
+  return {
+    root: currentRoot,
+    operations,
+    touchedNodes,
+  };
 }
 
 function seedActualDomFromHtml() {
@@ -206,8 +449,10 @@ function syncDerivedState() {
 }
 
 function renderAll() {
-  renderTree(refs.previousTree, state.previousVNode);
-  renderTree(refs.currentTree, state.liveVNode);
+  const highlightPaths = getTreeHighlightPaths(state.stagedPatches);
+
+  renderTree(refs.previousTree, state.previousVNode, highlightPaths.previous);
+  renderTree(refs.currentTree, state.liveVNode, highlightPaths.current);
   renderPatchList();
   renderDomOps();
   renderMutationLog();
@@ -309,7 +554,29 @@ function renderHistory() {
   });
 }
 
-function renderTree(container, vnode) {
+function getTreeHighlightPaths(patches) {
+  const previous = new Set();
+  const current = new Set();
+
+  patches.forEach((patch) => {
+    if (patch.type === PATCH_TYPES.CREATE) {
+      current.add(patch.path);
+      return;
+    }
+
+    if (patch.type === PATCH_TYPES.REMOVE) {
+      previous.add(patch.path);
+      return;
+    }
+
+    previous.add(patch.path);
+    current.add(patch.path);
+  });
+
+  return { previous, current };
+}
+
+function renderTree(container, vnode, highlightedPaths = new Set()) {
   container.replaceChildren();
 
   if (!vnode) {
@@ -320,7 +587,7 @@ function renderTree(container, vnode) {
   const rows = flattenVNode(vnode);
   rows.forEach((row) => {
     const rowEl = document.createElement("div");
-    rowEl.className = "tree-row";
+    rowEl.className = `tree-row${highlightedPaths.has(row.path) ? " is-highlighted" : ""}`;
     rowEl.style.setProperty("--depth", String(row.depth));
 
     const kind = document.createElement("span");
@@ -336,26 +603,31 @@ function renderTree(container, vnode) {
   });
 }
 
-function flattenVNode(vnode, depth = 0, rows = []) {
-  if (vnode.kind === "text") {
+function flattenVNode(vnode, depth = 0, rows = [], path = "root") {
+  if (vnode.nodeType === VNODE_TYPES.TEXT) {
     rows.push({
       depth,
       kind: "text",
-      label: JSON.stringify(vnode.text),
+      label: JSON.stringify(vnode.props?.nodeValue ?? ""),
+      path,
     });
     return rows;
   }
 
-  const attrs = Object.entries(vnode.attrs || {})
+  const attrs = Object.entries(vnode.props || {})
+    .filter(([key]) => key !== "key")
     .map(([key, value]) => `${key}="${value}"`)
     .join(" ");
   rows.push({
     depth,
-    kind: "node",
-    label: `<${vnode.tagName}${attrs ? ` ${attrs}` : ""}>`,
+    kind: vnode.nodeType.toLowerCase(),
+    label: `<${vnode.type}${attrs ? ` ${attrs}` : ""}>`,
+    path,
   });
 
-  (vnode.children || []).forEach((child) => flattenVNode(child, depth + 1, rows));
+  (vnode.children || []).forEach((child, index) =>
+    flattenVNode(child, depth + 1, rows, `${path}.children[${index}]`)
+  );
   return rows;
 }
 
@@ -379,7 +651,7 @@ function handlePatch() {
 
   clearPatchMarks();
 
-  const result = applyPatches(state.actualRoot, patchesToApply);
+  const result = applyCorePatches(state.actualRoot, patchesToApply, refs.actualHost);
   state.actualRoot = result.root;
 
   if (refs.actualHost.firstChild !== state.actualRoot) {
@@ -615,15 +887,15 @@ function getReplacementTag(tagName) {
 
 function analyzePaintImpact(patches) {
   if (!patches.length) return "idle";
-  if (patches.some((patch) => patch.type === "CREATE" || patch.type === "REMOVE" || patch.type === "REPLACE")) {
+  if (patches.some((patch) => [PATCH_TYPES.CREATE, PATCH_TYPES.REMOVE, PATCH_TYPES.REPLACE].includes(patch.type))) {
     return "high";
   }
   if (
     patches.some(
       (patch) =>
-        patch.type === "TEXT" ||
-        (patch.type === "ATTRS" &&
-          (patch.set.class || patch.set.style || patch.remove.includes("class") || patch.remove.includes("style")))
+        patch.type === PATCH_TYPES.UPDATE_TEXT ||
+        (patch.type === PATCH_TYPES.UPDATE_PROP &&
+          ["className", "style", "id"].includes(patch.key))
     )
   ) {
     return "medium";
@@ -687,36 +959,31 @@ function createEmptyItem(message) {
 
 function countNodes(vnode) {
   if (!vnode) return 0;
-  if (vnode.kind === "text") return 1;
   return 1 + (vnode.children || []).reduce((sum, child) => sum + countNodes(child), 0);
 }
 
 function describePatch(patch) {
-  if (patch.type === "CREATE") {
-    return `parent path ${formatPath(patch.path)} 아래 index ${patch.index}에 <${patch.node.tagName || "text"}> 생성`;
+  if (patch.type === PATCH_TYPES.CREATE) {
+    return `path ${patch.path}에 <${describeNodeLabel(patch.node)}> 생성`;
   }
-  if (patch.type === "REMOVE") {
-    return `path ${formatPath(patch.path)} 노드 제거`;
+  if (patch.type === PATCH_TYPES.REMOVE) {
+    return `path ${patch.path} 노드 제거`;
   }
-  if (patch.type === "REPLACE") {
-    return `path ${formatPath(patch.path)} 노드를 <${patch.node.tagName || "text"}>로 교체`;
+  if (patch.type === PATCH_TYPES.REPLACE) {
+    return `path ${patch.path} 노드를 <${describeNodeLabel(patch.newNode)}>로 교체`;
   }
-  if (patch.type === "TEXT") {
-    return `path ${formatPath(patch.path)} 텍스트를 ${JSON.stringify(truncate(patch.value, 48))}로 변경`;
+  if (patch.type === PATCH_TYPES.UPDATE_TEXT) {
+    return `path ${patch.path} 텍스트를 ${JSON.stringify(truncate(patch.newValue, 48))}로 변경`;
   }
-  return `path ${formatPath(patch.path)} 속성 변경: ${describeAttrPatch(patch)}`;
+  return `path ${patch.path} 속성 변경: ${describePropPatch(patch)}`;
 }
 
-function describeAttrPatch(patch) {
-  const setText = Object.entries(patch.set || {})
-    .map(([key, value]) => `${key}="${value}"`)
-    .join(", ");
-  const removeText = (patch.remove || []).map((name) => `${name} removed`).join(", ");
-  return [setText, removeText].filter(Boolean).join(" / ") || "none";
-}
+function describePropPatch(patch) {
+  if (patch.newValue === undefined) {
+    return `${patch.key} removed`;
+  }
 
-function formatPath(path) {
-  return path.length ? `[${path.join(", ")}]` : "[]";
+  return `${patch.key}="${patch.newValue}"`;
 }
 
 function makeHistoryEntry(stateName, summary, vnode, patches, patchSummary) {
@@ -833,8 +1100,8 @@ function exposeDebugHelpers() {
       stagedPatchDetails: state.stagedPatches.map((patch) => ({
         type: patch.type,
         path: patch.path,
-        index: patch.index ?? null,
-        node: patch.node?.tagName || patch.node?.kind || null,
+        key: patch.key ?? null,
+        node: patch.node?.type || patch.newNode?.type || null,
       })),
       domOpApis: state.lastDomOps.map((operation) => operation.api),
       domOpDetails: state.lastDomOps.map((operation) => operation.detail),
@@ -849,7 +1116,3 @@ function exposeDebugHelpers() {
     runScenario: runDemoScenario,
   };
 }
-
-
-
-

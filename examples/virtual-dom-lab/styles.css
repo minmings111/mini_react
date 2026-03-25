@@ -8,7 +8,8 @@
   --amber: #ffc671;
   --coral: #ff8f6f;
   --shadow: 0 24px 50px rgba(2, 9, 18, 0.45);
-  --grid: linear-gradient(rgba(130, 183, 234, 0.08) 1px, transparent 1px),
+  --grid:
+    linear-gradient(rgba(130, 183, 234, 0.08) 1px, transparent 1px),
     linear-gradient(90deg, rgba(130, 183, 234, 0.08) 1px, transparent 1px);
 }
 
@@ -28,8 +29,16 @@ body {
   color: var(--text);
   font-family: "Bahnschrift", "Trebuchet MS", "Segoe UI", sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(55, 114, 167, 0.22), transparent 28%),
-    radial-gradient(circle at top right, rgba(52, 191, 198, 0.18), transparent 24%),
+    radial-gradient(
+      circle at top left,
+      rgba(55, 114, 167, 0.22),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(52, 191, 198, 0.18),
+      transparent 24%
+    ),
     linear-gradient(180deg, #07111d 0%, #091726 48%, #050c15 100%);
 }
 
@@ -113,7 +122,7 @@ p {
 }
 
 h1 {
-  max-width: 18ch;
+  max-width: 22ch;
   font-size: clamp(2rem, 4vw, 3.8rem);
   line-height: 0.98;
 }
@@ -206,7 +215,11 @@ h3 {
 .history-button {
   border-radius: 999px;
   cursor: pointer;
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, opacity 160ms ease;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    opacity 160ms ease;
 }
 
 .primary-button,
@@ -282,7 +295,11 @@ button:disabled {
   border: 1px solid rgba(116, 231, 255, 0.15);
   border-radius: 22px;
   background:
-    radial-gradient(circle at top right, rgba(116, 231, 255, 0.14), transparent 36%),
+    radial-gradient(
+      circle at top right,
+      rgba(116, 231, 255, 0.14),
+      transparent 36%
+    ),
     rgba(13, 29, 47, 0.62);
 }
 
@@ -291,7 +308,11 @@ button:disabled {
   position: absolute;
   inset: auto 18px 18px;
   height: 2px;
-  background: linear-gradient(90deg, rgba(116, 231, 255, 0.12), rgba(116, 231, 255, 0.74));
+  background: linear-gradient(
+    90deg,
+    rgba(116, 231, 255, 0.12),
+    rgba(116, 231, 255, 0.74)
+  );
   transform: scaleX(0.25);
   transform-origin: left;
   transition: transform 180ms ease;
@@ -499,7 +520,11 @@ button:disabled {
   padding: 0 16px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(116, 231, 255, 0.92), rgba(65, 192, 201, 0.92));
+  background: linear-gradient(
+    135deg,
+    rgba(116, 231, 255, 0.92),
+    rgba(65, 192, 201, 0.92)
+  );
   color: #04111a;
   font-weight: 700;
 }
@@ -600,7 +625,11 @@ button:disabled {
   border: 1px solid rgba(159, 184, 207, 0.14);
   border-radius: 22px;
   background:
-    radial-gradient(circle at top right, rgba(116, 231, 255, 0.09), transparent 42%),
+    radial-gradient(
+      circle at top right,
+      rgba(116, 231, 255, 0.09),
+      transparent 42%
+    ),
     rgba(159, 184, 207, 0.04);
 }
 
@@ -616,7 +645,6 @@ button:disabled {
   color: var(--muted);
   line-height: 1.5;
 }
-
 
 @media (max-width: 1240px) {
   .hero,
@@ -656,5 +684,3 @@ button:disabled {
     min-height: 306px;
   }
 }
-
-
