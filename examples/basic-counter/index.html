@@ -3,10 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>mini-react example</title>
+    <title>mini-react basic counter lab</title>
   </head>
   <body>
-    <div id="app"></div>
+    <main>
+      <section>
+        <h1>Basic Counter Lab</h1>
+        <p>render, diff, commit 흐름을 눈으로 확인하는 mini-react 예제입니다.</p>
+        <div>
+          <button id="decrement-button" type="button">-1</button>
+          <button id="increment-button" type="button">+1</button>
+          <button id="reset-button" type="button">reset</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Rendered DOM</h2>
+        <div id="app"></div>
+      </section>
+
+      <section>
+        <h2>Debug Panel</h2>
+        <div id="debug-panel"></div>
+      </section>
+    </main>
     <script type="module" src="./main.js"></script>
   </body>
 </html>

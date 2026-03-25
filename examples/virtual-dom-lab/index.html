@@ -14,31 +14,7 @@
       <header class="hero panel">
         <div class="hero-copy">
           <p class="eyebrow">CSR + Vanilla JavaScript</p>
-          <h1>브라우저 DOM이 Virtual DOM이 되고, Diff를 거쳐 다시 화면에 반영되는 흐름</h1>
-          <p class="hero-body">
-            왼쪽의 Actual DOM은 Patch 버튼을 누르기 전까지 그대로 유지됩니다. 오른쪽의 Test DOM을
-            직접 수정하거나 구조 버튼을 눌러 바꾸면, 아래 패널에서 Virtual DOM 트리와 Diff 결과를
-            바로 확인할 수 있습니다.
-          </p>
-        </div>
-
-        <div class="hero-controls">
-          <div class="meta-row">
-            <span class="meta-chip">렌더링 방식: CSR</span>
-            <span class="meta-chip">Diff 핵심 케이스: 5가지</span>
-            <span class="meta-chip">구현 언어: Vanilla JS</span>
-          </div>
-
-          <div class="action-row">
-            <button id="patch-button" class="primary-button" type="button">Patch 적용</button>
-            <button id="undo-button" class="ghost-button" type="button">뒤로가기</button>
-            <button id="redo-button" class="ghost-button" type="button">앞으로가기</button>
-            <button id="reset-button" class="ghost-button" type="button">샘플 복원</button>
-          </div>
-
-          <p id="status-line" class="status-line">
-            실제 영역의 샘플 HTML을 읽어 Virtual DOM으로 바꾸고 있습니다.
-          </p>
+          <h1>돌돔 참돔 감성돔, 버추얼 돔</h1>
         </div>
       </header>
 
@@ -93,10 +69,13 @@
                 </div>
                 <span id="actual-chip" class="state-chip">기준 상태</span>
               </div>
-              <p class="panel-description">
-                Patch 버튼을 누르기 전까지는 실제 브라우저 DOM이 유지됩니다. 변경된 노드만 강조
-                표시됩니다.
-              </p>
+              <div class="frame-offset-stack frame-offset-copy">
+                <p class="frame-offset-text">
+                  Patch 버튼을 누르기 전까지는 실제 브라우저 DOM이 유지 됩니다. 변경된 노드만 강조
+                  표시됩니다.
+                </p>
+                <div class="control-placeholder control-placeholder-secondary" aria-hidden="true"></div>
+              </div>
               <div class="scene-frame">
                 <div id="actual-host" class="scene-host actual-host" aria-label="실제 영역"></div>
               </div>
@@ -110,72 +89,25 @@
                 </div>
                 <span id="selection-chip" class="state-chip subtle">선택 없음</span>
               </div>
-              <p class="panel-description">
-                텍스트는 직접 수정하고, 아래 툴바로 구조를 바꿔보세요. 이 영역은 다음 Patch의 입력
-                값입니다.
-              </p>
-
-              <div class="toolbar" role="toolbar" aria-label="테스트 영역 구조 조작">
-                <button id="add-child-button" class="tool-button" type="button">자식 추가</button>
-                <button id="toggle-attr-button" class="tool-button" type="button">속성 토글</button>
-                <button id="replace-tag-button" class="tool-button" type="button">태그 교체</button>
-                <button id="delete-node-button" class="tool-button danger" type="button">노드 삭제</button>
+              <div class="frame-offset-stack">
+                <div class="action-row test-action-row">
+                  <button id="patch-button" class="primary-button" type="button">Patch</button>
+                  <button id="undo-button" class="ghost-button" type="button">뒤로</button>
+                  <button id="redo-button" class="ghost-button" type="button">앞으로</button>
+                  <button id="reset-button" class="ghost-button" type="button">샘플 복원</button>
+                </div>
+                <div class="toolbar" role="toolbar" aria-label="테스트 영역 구조 조작">
+                  <button id="add-child-button" class="tool-button" type="button">자식 추가</button>
+                  <button id="replace-tag-button" class="tool-button" type="button">태그 교체</button>
+                  <button id="delete-node-button" class="tool-button danger" type="button">노드 삭제</button>
+                </div>
               </div>
 
               <div class="scene-frame">
                 <div id="test-host" class="scene-host test-host" aria-label="테스트 영역"></div>
               </div>
-
-              <div class="hint-strip">
-                <span>팁: 텍스트를 클릭해 바로 고칠 수 있습니다.</span>
-                <span>노드를 클릭하면 선택되고 툴바가 그 노드에 작동합니다.</span>
-              </div>
             </section>
           </div>
-
-          <section class="panel theory-panel">
-            <div class="panel-heading">
-              <div>
-                <p class="section-label">Concept Map</p>
-                <h2>왜 Virtual DOM이 필요한가</h2>
-              </div>
-              <span id="impact-badge" class="impact-badge impact-idle">Patch 대기</span>
-            </div>
-
-            <div class="theory-grid">
-              <article class="theory-card">
-                <h3>실제 DOM이 느릴 수 있는 이유</h3>
-                <p>
-                  실제 DOM은 브라우저 렌더링 엔진과 연결되어 있어 수정될 때 레이아웃 계산(Reflow)과
-                  다시 그리기(Repaint)가 뒤따를 수 있습니다.
-                </p>
-              </article>
-              <article class="theory-card">
-                <h3>Virtual DOM이 하는 일</h3>
-                <p>
-                  화면의 구조를 JS 객체 트리로 표현해 두고, 변경 전/후 스냅샷을 비교해 어떤 부분만
-                  바꾸면 되는지 계산합니다.
-                </p>
-              </article>
-              <article class="theory-card">
-                <h3>Diff 5가지 핵심 케이스</h3>
-                <ul class="case-list">
-                  <li>CREATE: 새 노드 생성</li>
-                  <li>REMOVE: 기존 노드 제거</li>
-                  <li>REPLACE: 노드 종류나 태그 자체 교체</li>
-                  <li>TEXT: 텍스트만 변경</li>
-                  <li>ATTRS: 속성만 변경</li>
-                </ul>
-              </article>
-              <article class="theory-card">
-                <h3>React와 연결해서 보면</h3>
-                <p>
-                  React는 상태가 바뀌면 새 Virtual DOM을 만들고, 이전 스냅샷과 비교한 뒤 Commit
-                  단계에서 실제 DOM을 바꿉니다. 이 페이지는 그 핵심만 축약해 보여줍니다.
-                </p>
-              </article>
-            </div>
-          </section>
         </div>
 
         <aside class="inspector-column">

@@ -22,7 +22,8 @@ export function render(nextVNode, container) {
   });
 
   return {
-    vnode: nextVNode,
+    oldVNode: previousState.currentVNode,
+    newVNode: nextVNode,
     patches,
     rootDomNode,
   };
