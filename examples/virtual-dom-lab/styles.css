@@ -241,6 +241,11 @@ h3 {
   color: var(--text);
 }
 
+.source-apply-button {
+  min-height: 38px;
+  padding: 0 14px;
+}
+
 .tool-button {
   min-height: 40px;
   padding: 0 14px;
@@ -373,6 +378,46 @@ button:disabled {
     linear-gradient(180deg, rgba(8, 18, 30, 0.88), rgba(7, 15, 26, 0.96)),
     rgba(5, 11, 18, 0.92);
   min-height: 460px;
+}
+
+.source-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid rgba(116, 231, 255, 0.12);
+  border-radius: 24px;
+  background: rgba(8, 18, 30, 0.72);
+}
+
+.source-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.source-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.html-source {
+  width: 100%;
+  min-height: 220px;
+  padding: 16px;
+  border: 1px solid rgba(159, 184, 207, 0.18);
+  border-radius: 18px;
+  resize: vertical;
+  color: #def2ff;
+  background: rgba(5, 11, 18, 0.92);
+  font: 0.88rem/1.6 Consolas, "Courier New", monospace;
+}
+
+.html-source:focus {
+  outline: 2px solid rgba(116, 231, 255, 0.34);
+  outline-offset: 2px;
 }
 
 .scene-host {

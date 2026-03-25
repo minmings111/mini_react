@@ -38,6 +38,9 @@ const SAMPLE_HTML = `
 const refs = {
   actualHost: document.getElementById("actual-host"),
   testHost: document.getElementById("test-host"),
+  htmlSource: document.getElementById("html-source"),
+  applySourceButton: document.getElementById("apply-source-button"),
+  sourceSyncChip: document.getElementById("source-sync-chip"),
   actualChip: document.getElementById("actual-chip"),
   selectionChip: document.getElementById("selection-chip"),
   historyChip: document.getElementById("history-chip"),
@@ -79,6 +82,7 @@ const state = {
   refreshQueued: false,
   highlightTimer: 0,
   pipelineTimers: [],
+  sourceDirty: false,
 };
 
 const IGNORED_TEST_ATTRS = new Set(["contenteditable", "spellcheck"]);
@@ -118,6 +122,13 @@ function bindEvents() {
   refs.addChildButton.addEventListener("click", handleAddChild);
   refs.replaceTagButton.addEventListener("click", handleReplaceTag);
   refs.deleteNodeButton.addEventListener("click", handleDeleteNode);
+  refs.applySourceButton.addEventListener("click", handleApplySource);
+  refs.htmlSource.addEventListener("input", () => {
+    state.sourceDirty = true;
+    renderSourceEditor();
+    renderButtons();
+    previewSourceInput();
+  });
 
   refs.testHost.addEventListener("click", handleTestStageClick);
   refs.testHost.addEventListener("input", () => {
@@ -202,6 +213,7 @@ function renderAll() {
   renderMetrics();
   renderChips();
   renderButtons();
+  renderSourceEditor();
 }
 
 function renderMetrics() {
@@ -233,6 +245,15 @@ function renderButtons() {
   refs.addChildButton.disabled = !hasSelection;
   refs.replaceTagButton.disabled = !hasSelection;
   refs.deleteNodeButton.disabled = !canDeleteSelection;
+  refs.applySourceButton.disabled = !state.sourceDirty || !refs.htmlSource.value.trim();
+}
+
+function renderSourceEditor() {
+  if (!state.sourceDirty) {
+    refs.htmlSource.value = serializeCurrentTestHtml();
+  }
+
+  refs.sourceSyncChip.textContent = state.sourceDirty ? "편집 중" : "동기화됨";
 }
 
 function renderPatchList() {
@@ -456,6 +477,7 @@ function renderTestFromVNode(vnode) {
     refs.testHost.append(nextRoot);
     state.testRoot = nextRoot;
   });
+  state.sourceDirty = false;
 }
 
 function decorateTestRoot(root) {
@@ -586,6 +608,17 @@ function handleDeleteNode() {
   setSelectedNode(parent || state.testRoot);
   setStatus(`<${tagName}>를 삭제했습니다. 다음 Patch에서 REMOVE가 생성됩니다.`);
   scheduleRefresh();
+}
+
+function handleApplySource() {
+  const applied = applySourceToTestHost();
+  if (!applied) return;
+
+  state.sourceDirty = false;
+  syncDerivedState();
+  renderAll();
+  setStatus("HTML 코드 편집 내용으로 테스트 영역을 다시 렌더링했습니다.");
+  playPipeline(["read", "diff"]);
 }
 
 function getReplacementTag(tagName) {
@@ -943,6 +976,59 @@ function applyPatchesWithLog(rootNode, patches, container) {
     operations,
     touchedNodes,
   };
+}
+
+function serializeCurrentTestHtml() {
+  if (!state.testRoot) return "";
+
+  const currentVNode = sanitizeVNode(domToVNode(state.testRoot));
+  if (!currentVNode) return "";
+
+  const html = createRealNode(cloneVNode(currentVNode)).outerHTML;
+  return html;
+}
+
+function previewSourceInput() {
+  const applied = applySourceToTestHost();
+
+  if (!applied) {
+    return;
+  }
+
+  syncDerivedState();
+  renderAll();
+  setStatus("HTML 코드 편집 내용이 테스트 영역에 미리 반영되었습니다. Patch를 누르면 실제 영역에 적용됩니다.");
+  playPipeline(["read", "diff"]);
+}
+
+function applySourceToTestHost() {
+  const source = refs.htmlSource.value.trim();
+
+  if (!source) {
+    return false;
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = source;
+
+  const rootElements = [...template.content.children];
+
+  if (rootElements.length !== 1) {
+    setStatus("HTML 코드 편집은 루트 요소 1개만 허용합니다.");
+    return false;
+  }
+
+  const nextRoot = rootElements[0];
+
+  withInternalMutation(() => {
+    refs.testHost.replaceChildren();
+    decorateTestRoot(nextRoot);
+    refs.testHost.append(nextRoot);
+    state.testRoot = nextRoot;
+  });
+
+  clearSelectedNode();
+  return true;
 }
 
 
