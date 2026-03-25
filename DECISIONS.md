@@ -86,6 +86,19 @@
 
 - `type / props / children`은 VNode의 구조입니다.
 - `ELEMENT / TEXT / COMPONENT`는 VNode의 종류입니다.
+- 텍스트 노드의 `type`은 문자열 리터럴로 직접 쓰지 않고 내부 상수를 사용합니다.
+
+### VNode Internal Types
+
+현재 내부적으로 사용하는 보조 type 값은 아래와 같습니다.
+
+- `TEXT_ELEMENT`
+
+설명:
+
+- `TEXT_ELEMENT`는 `TEXT` 노드의 `type`에 들어가는 내부 식별자입니다.
+- `nodeType`이 `TEXT`인지가 핵심 분류이고, `TEXT_ELEMENT`는 그 텍스트 노드의 내부 type 표현입니다.
+- `createTextVNode()`는 명시적으로 TEXT VNode를 만들고 싶을 때 사용하는 공개 helper로 유지합니다.
 
 ### Virtual DOM Node Categories
 
@@ -113,7 +126,7 @@
   children: [
     {
       nodeType: "TEXT",
-      type: "TEXT_ELEMENT",
+      type: VNODE_INTERNAL_TYPES.TEXT_ELEMENT,
       props: { nodeValue: "저장" },
       children: []
     }
@@ -126,7 +139,7 @@
 ```js
 {
   nodeType: "TEXT",
-  type: "TEXT_ELEMENT",
+  type: VNODE_INTERNAL_TYPES.TEXT_ELEMENT,
   props: { nodeValue: "Count: 1" },
   children: []
 }
@@ -148,6 +161,27 @@
 - `ELEMENT`일 때 `type`은 보통 `"div"`, `"button"` 같은 태그 문자열입니다.
 - `TEXT`일 때 `type`은 보조 식별자이고, 실제 값은 `props.nodeValue`에 들어갑니다.
 - `COMPONENT`일 때 `type`은 태그명이 아니라 함수 참조입니다.
+
+### Child Normalization Policy
+
+`h()`가 children을 정리할 때의 규칙은 아래와 같습니다.
+
+- 문자열 child는 `TEXT` VNode로 바꿉니다.
+- 숫자 child는 문자열로 변환한 뒤 `TEXT` VNode로 바꿉니다.
+- `null`, `undefined`, `true`, `false`는 children에서 제거합니다.
+- 이미 VNode인 child는 그대로 유지합니다.
+
+예시:
+
+```js
+h("div", null, null, false, "hello", 42)
+```
+
+결과:
+
+- `null`, `false`는 제거됩니다.
+- `"hello"`는 `TEXT` VNode가 됩니다.
+- `42`는 `"42"` 값을 가진 `TEXT` VNode가 됩니다.
 
 ### Patch Types
 
