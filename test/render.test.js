@@ -32,4 +32,6 @@ test("render returns patches array", () => {
   const result = render(h("div", null, "hello"), container);
 
   assert.ok(Array.isArray(result.patches));
+  assert.equal(result.oldVNode, null);
+  assert.equal(result.newVNode.type, "div");
 });
