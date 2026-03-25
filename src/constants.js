@@ -4,6 +4,10 @@ export const VNODE_TYPES = {
   COMPONENT: "COMPONENT",
 };
 
+export const VNODE_INTERNAL_TYPES = {
+  TEXT_ELEMENT: "TEXT_ELEMENT",
+};
+
 export const PATCH_TYPES = {
   CREATE: "CREATE",
   REMOVE: "REMOVE",
