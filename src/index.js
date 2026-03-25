@@ -2,4 +2,7 @@ export { h, createTextVNode } from "./h.js";
 export { render } from "./render.js";
 export { diff } from "./diff.js";
 export { commitPatches, applyPatch } from "./commit.js";
-export { VNODE_TYPES, PATCH_TYPES } from "./constants.js";
+export { createRealNode } from "./create-real-node.js";
+export { cloneVNode, domToVNode } from "./dom-to-vnode.js";
+export { getNodeByPath } from "./path.js";
+export { VNODE_TYPES, VNODE_INTERNAL_TYPES, PATCH_TYPES } from "./constants.js";

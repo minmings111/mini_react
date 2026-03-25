@@ -1,9 +1,9 @@
-import { VNODE_TYPES } from "./constants.js";
+import { VNODE_INTERNAL_TYPES, VNODE_TYPES } from "./constants.js";
 
 function createTextNode(value) {
   return {
     nodeType: VNODE_TYPES.TEXT,
-    type: "TEXT_ELEMENT",
+    type: VNODE_INTERNAL_TYPES.TEXT_ELEMENT,
     props: {
       nodeValue: String(value),
     },
