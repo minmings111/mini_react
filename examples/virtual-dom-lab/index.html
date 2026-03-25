@@ -103,6 +103,27 @@
                 </div>
               </div>
 
+              <div class="source-panel">
+                <div class="source-panel-header">
+                  <div>
+                    <p class="section-label">HTML Source</p>
+                    <h3>코드 편집</h3>
+                  </div>
+                  <div class="source-panel-actions">
+                    <span id="source-sync-chip" class="state-chip subtle">동기화됨</span>
+                    <button id="apply-source-button" class="ghost-button source-apply-button" type="button">
+                      코드 반영
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  id="html-source"
+                  class="html-source"
+                  spellcheck="false"
+                  aria-label="테스트 영역 HTML 코드 편집기"
+                ></textarea>
+              </div>
+
               <div class="scene-frame">
                 <div id="test-host" class="scene-host test-host" aria-label="테스트 영역"></div>
               </div>
@@ -177,6 +198,6 @@
       </section>
     </main>
 
-    <script type="module" src="./src/app.js"></script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

@@ -1,4 +1,13 @@
-﻿import { applyPatches, cloneVNode, createDomFromVNode, diff, domToVNode } from "./mini-vdom.js";
+﻿import {
+  applyPatch,
+  cloneVNode,
+  createRealNode,
+  diff,
+  domToVNode,
+  getNodeByPath,
+  PATCH_TYPES,
+  VNODE_TYPES,
+} from "../../src/index.js";
 
 const SAMPLE_HTML = `
   <article class="scene-root" data-tone="calm">
@@ -29,6 +38,9 @@ const SAMPLE_HTML = `
 const refs = {
   actualHost: document.getElementById("actual-host"),
   testHost: document.getElementById("test-host"),
+  htmlSource: document.getElementById("html-source"),
+  applySourceButton: document.getElementById("apply-source-button"),
+  sourceSyncChip: document.getElementById("source-sync-chip"),
   actualChip: document.getElementById("actual-chip"),
   selectionChip: document.getElementById("selection-chip"),
   historyChip: document.getElementById("history-chip"),
@@ -70,7 +82,10 @@ const state = {
   refreshQueued: false,
   highlightTimer: 0,
   pipelineTimers: [],
+  sourceDirty: false,
 };
+
+const IGNORED_TEST_ATTRS = new Set(["contenteditable", "spellcheck"]);
 
 initialize();
 
@@ -81,7 +96,7 @@ function initialize() {
   syncDerivedState();
   renderAll();
   setStatus("실제 DOM을 읽어 Virtual DOM으로 만들고, 그 스냅샷으로 테스트 영역을 렌더링했습니다.");
-  playPipeline(["read", "diff"]);
+  playPipeline(["read"]);
   exposeDebugHelpers();
 }
 
@@ -107,6 +122,13 @@ function bindEvents() {
   refs.addChildButton.addEventListener("click", handleAddChild);
   refs.replaceTagButton.addEventListener("click", handleReplaceTag);
   refs.deleteNodeButton.addEventListener("click", handleDeleteNode);
+  refs.applySourceButton.addEventListener("click", handleApplySource);
+  refs.htmlSource.addEventListener("input", () => {
+    state.sourceDirty = true;
+    renderSourceEditor();
+    renderButtons();
+    previewSourceInput();
+  });
 
   refs.testHost.addEventListener("click", handleTestStageClick);
   refs.testHost.addEventListener("input", () => {
@@ -173,7 +195,7 @@ function scheduleRefresh() {
 
 function syncDerivedState() {
   state.previousVNode = cloneVNode(state.history[state.pointer].vnode);
-  state.liveVNode = state.testRoot ? domToVNode(state.testRoot) : null;
+  state.liveVNode = state.testRoot ? sanitizeVNode(domToVNode(state.testRoot)) : null;
   state.stagedPatches = state.liveVNode ? diff(state.previousVNode, state.liveVNode) : [];
 
   if (state.selectedNode && !refs.testHost.contains(state.selectedNode)) {
@@ -191,6 +213,7 @@ function renderAll() {
   renderMetrics();
   renderChips();
   renderButtons();
+  renderSourceEditor();
 }
 
 function renderMetrics() {
@@ -222,6 +245,15 @@ function renderButtons() {
   refs.addChildButton.disabled = !hasSelection;
   refs.replaceTagButton.disabled = !hasSelection;
   refs.deleteNodeButton.disabled = !canDeleteSelection;
+  refs.applySourceButton.disabled = !state.sourceDirty || !refs.htmlSource.value.trim();
+}
+
+function renderSourceEditor() {
+  if (!state.sourceDirty) {
+    refs.htmlSource.value = serializeCurrentTestHtml();
+  }
+
+  refs.sourceSyncChip.textContent = state.sourceDirty ? "편집 중" : "동기화됨";
 }
 
 function renderPatchList() {
@@ -313,23 +345,23 @@ function renderTree(container, vnode, patches = []) {
 }
 
 function flattenVNode(vnode, depth = 0, rows = [], path = []) {
-  if (vnode.kind === "text") {
+  if (vnode.nodeType === VNODE_TYPES.TEXT) {
     rows.push({
       depth,
       kind: "text",
-      label: JSON.stringify(vnode.text),
+      label: JSON.stringify(vnode.props?.nodeValue ?? ""),
       path: [...path],
     });
     return rows;
   }
 
-  const attrs = Object.entries(vnode.attrs || {})
+  const attrs = Object.entries(vnode.props || {})
     .map(([key, value]) => `${key}="${value}"`)
     .join(" ");
   rows.push({
     depth,
     kind: "node",
-    label: `<${vnode.tagName}${attrs ? ` ${attrs}` : ""}>`,
+    label: `<${vnode.type}${attrs ? ` ${attrs}` : ""}>`,
     path: [...path],
   });
 
@@ -359,7 +391,7 @@ function handlePatch() {
 
   clearPatchMarks();
 
-  const result = applyPatches(state.actualRoot, patchesToApply);
+  const result = applyPatchesWithLog(state.actualRoot, patchesToApply, refs.actualHost);
   state.actualRoot = result.root;
 
   if (refs.actualHost.firstChild !== state.actualRoot) {
@@ -432,7 +464,7 @@ function handleReset() {
 
 function renderActualFromVNode(vnode) {
   refs.actualHost.replaceChildren();
-  const nextRoot = createDomFromVNode(cloneVNode(vnode));
+  const nextRoot = createRealNode(cloneVNode(vnode));
   refs.actualHost.append(nextRoot);
   state.actualRoot = nextRoot;
 }
@@ -440,17 +472,41 @@ function renderActualFromVNode(vnode) {
 function renderTestFromVNode(vnode) {
   withInternalMutation(() => {
     refs.testHost.replaceChildren();
-    const nextRoot = createDomFromVNode(cloneVNode(vnode));
+    const nextRoot = createRealNode(cloneVNode(vnode));
     decorateTestRoot(nextRoot);
     refs.testHost.append(nextRoot);
     state.testRoot = nextRoot;
   });
+  state.sourceDirty = false;
 }
 
 function decorateTestRoot(root) {
   root.setAttribute("contenteditable", "true");
   root.setAttribute("spellcheck", "false");
   root.setAttribute("data-lab-root", "true");
+}
+
+function sanitizeVNode(vnode) {
+  if (!vnode) return null;
+
+  if (vnode.nodeType === VNODE_TYPES.TEXT) {
+    return cloneVNode(vnode);
+  }
+
+  const filteredProps = Object.fromEntries(
+    Object.entries(vnode.props || {}).filter(([key]) => {
+      if (IGNORED_TEST_ATTRS.has(key)) return false;
+      if (key.startsWith("data-lab-")) return false;
+      return true;
+    })
+  );
+
+  return {
+    nodeType: vnode.nodeType,
+    type: vnode.type,
+    props: filteredProps,
+    children: (vnode.children || []).map((child) => sanitizeVNode(child)).filter(Boolean),
+  };
 }
 
 function handleTestStageClick(event) {
@@ -554,6 +610,17 @@ function handleDeleteNode() {
   scheduleRefresh();
 }
 
+function handleApplySource() {
+  const applied = applySourceToTestHost();
+  if (!applied) return;
+
+  state.sourceDirty = false;
+  syncDerivedState();
+  renderAll();
+  setStatus("HTML 코드 편집 내용으로 테스트 영역을 다시 렌더링했습니다.");
+  playPipeline(["read", "diff"]);
+}
+
 function getReplacementTag(tagName) {
   const map = {
     article: "section",
@@ -577,15 +644,24 @@ function getReplacementTag(tagName) {
 
 function analyzePaintImpact(patches) {
   if (!patches.length) return "idle";
-  if (patches.some((patch) => patch.type === "CREATE" || patch.type === "REMOVE" || patch.type === "REPLACE")) {
+  if (
+    patches.some(
+      (patch) =>
+        patch.type === PATCH_TYPES.CREATE ||
+        patch.type === PATCH_TYPES.REMOVE ||
+        patch.type === PATCH_TYPES.REPLACE
+    )
+  ) {
     return "high";
   }
   if (
     patches.some(
       (patch) =>
-        patch.type === "TEXT" ||
-        (patch.type === "ATTRS" &&
-          (patch.set.class || patch.set.style || patch.remove.includes("class") || patch.remove.includes("style")))
+        patch.type === PATCH_TYPES.UPDATE_TEXT ||
+        (patch.type === PATCH_TYPES.UPDATE_PROP &&
+          (patch.key === "class" ||
+            patch.key === "className" ||
+            patch.key === "style"))
     )
   ) {
     return "medium";
@@ -633,36 +709,36 @@ function createEmptyItem(message) {
 
 function countNodes(vnode) {
   if (!vnode) return 0;
-  if (vnode.kind === "text") return 1;
+  if (vnode.nodeType === VNODE_TYPES.TEXT) return 1;
   return 1 + (vnode.children || []).reduce((sum, child) => sum + countNodes(child), 0);
 }
 
 function describePatch(patch) {
-  if (patch.type === "CREATE") {
-    return `parent path ${formatPath(patch.path)} 아래 index ${patch.index}에 <${patch.node.tagName || "text"}> 생성`;
+  if (patch.type === PATCH_TYPES.CREATE) {
+    return `parent path ${formatPath(patch.path)} 아래에 ${describeVNode(patch.node)} 생성`;
   }
-  if (patch.type === "REMOVE") {
+  if (patch.type === PATCH_TYPES.REMOVE) {
     return `path ${formatPath(patch.path)} 노드 제거`;
   }
-  if (patch.type === "REPLACE") {
-    return `path ${formatPath(patch.path)} 노드를 <${patch.node.tagName || "text"}>로 교체`;
+  if (patch.type === PATCH_TYPES.REPLACE) {
+    return `path ${formatPath(patch.path)} 노드를 ${describeVNode(patch.newNode)}로 교체`;
   }
-  if (patch.type === "TEXT") {
-    return `path ${formatPath(patch.path)} 텍스트를 ${JSON.stringify(truncate(patch.value, 48))}로 변경`;
+  if (patch.type === PATCH_TYPES.UPDATE_TEXT) {
+    return `path ${formatPath(patch.path)} 텍스트를 ${JSON.stringify(truncate(patch.newValue, 48))}로 변경`;
   }
   return `path ${formatPath(patch.path)} 속성 변경: ${describeAttrPatch(patch)}`;
 }
 
 function describeAttrPatch(patch) {
-  const setText = Object.entries(patch.set || {})
-    .map(([key, value]) => `${key}="${value}"`)
-    .join(", ");
-  const removeText = (patch.remove || []).map((name) => `${name} removed`).join(", ");
-  return [setText, removeText].filter(Boolean).join(" / ") || "none";
+  if (patch.type !== PATCH_TYPES.UPDATE_PROP) return "none";
+  if (patch.newValue == null) {
+    return `${patch.key} removed`;
+  }
+  return `${patch.key}="${patch.newValue}"`;
 }
 
 function formatPath(path) {
-  return path.length ? `[${path.join(", ")}]` : "[]";
+  return path || "root";
 }
 
 function makeHistoryEntry(stateName, summary, vnode, patches, patchSummary) {
@@ -684,11 +760,7 @@ function setStatus(message) {
 
 function getChangedTreePaths(patches) {
   return patches.map((patch) => {
-    if (patch.type === "CREATE") {
-      return [...(patch.path || []), patch.index];
-    }
-
-    return [...(patch.path || [])];
+    return parsePatchPath(patch.path);
   });
 }
 
@@ -751,27 +823,11 @@ function runDemoScenario() {
   if (!state.testRoot) return null;
 
   const header = state.testRoot.children[0];
-  const summary = state.testRoot.children[2];
-  const callout = state.testRoot.children[3];
-  const featureList = state.testRoot.children[4];
-  if (!header || !summary || !callout || !featureList) return null;
+  const summary = state.testRoot.children[1];
+  if (!header || !summary) return null;
 
-  const calloutTarget = callout.firstElementChild || callout;
-  const summaryTarget = summary.firstElementChild || summary;
-
-  setSelectedNode(calloutTarget);
-  calloutTarget.textContent = "Patch는 바뀐 부분만 실제 DOM에 반영합니다.";
-
-  setSelectedNode(summaryTarget);
-  handleToggleAttribute();
-
-  setSelectedNode(featureList);
+  setSelectedNode(summary);
   handleAddChild();
-
-  if (featureList.children[1]) {
-    setSelectedNode(featureList.children[1]);
-    handleDeleteNode();
-  }
 
   setSelectedNode(header);
   handleReplaceTag();
@@ -793,8 +849,8 @@ function exposeDebugHelpers() {
       stagedPatchDetails: state.stagedPatches.map((patch) => ({
         type: patch.type,
         path: patch.path,
-        index: patch.index ?? null,
-        node: patch.node?.tagName || patch.node?.kind || null,
+        index: null,
+        node: patch.node?.type || patch.newNode?.type || patch.node?.nodeType || null,
       })),
       domOpApis: state.lastDomOps.map((operation) => operation.api),
       domOpDetails: state.lastDomOps.map((operation) => operation.detail),
@@ -808,6 +864,171 @@ function exposeDebugHelpers() {
     reset: handleReset,
     runScenario: runDemoScenario,
   };
+}
+
+function describeVNode(vnode) {
+  if (!vnode) return "<null>";
+  if (vnode.nodeType === VNODE_TYPES.TEXT) return "<text>";
+  return `<${vnode.type}>`;
+}
+
+function parsePatchPath(path) {
+  if (!path || path === "root") return [];
+  return [...path.matchAll(/children\[(\d+)\]/g)].map((match) => Number(match[1]));
+}
+
+function getNodeByPathSafe(rootNode, path) {
+  if (!rootNode || !path) return null;
+
+  try {
+    return getNodeByPath(rootNode, path);
+  } catch {
+    return null;
+  }
+}
+
+function pushTouchedNode(touchedNodes, node) {
+  const targetNode = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+
+  if (!targetNode || touchedNodes.includes(targetNode)) return;
+  touchedNodes.push(targetNode);
+}
+
+function applyPatchesWithLog(rootNode, patches, container) {
+  let nextRoot = rootNode;
+  const operations = [];
+  const touchedNodes = [];
+
+  patches.forEach((patch) => {
+    if (patch.type === PATCH_TYPES.CREATE) {
+      const parentBefore = patch.path === "root" ? container : getNodeByPathSafe(nextRoot, patch.path);
+      operations.push({
+        api: "appendChild",
+        detail: `path ${formatPath(patch.path)} 아래에 ${describeVNode(patch.node)}를 생성했습니다.`,
+      });
+      nextRoot = applyPatch(nextRoot, patch, container);
+      if (patch.path === "root") {
+        pushTouchedNode(touchedNodes, nextRoot);
+      } else {
+        pushTouchedNode(touchedNodes, parentBefore?.lastChild || parentBefore);
+      }
+      return;
+    }
+
+    if (patch.type === PATCH_TYPES.REMOVE) {
+      const targetBefore = getNodeByPathSafe(nextRoot, patch.path);
+      operations.push({
+        api: "removeChild",
+        detail: `path ${formatPath(patch.path)}의 노드를 제거했습니다.`,
+      });
+      pushTouchedNode(touchedNodes, targetBefore?.parentNode);
+      nextRoot = applyPatch(nextRoot, patch, container);
+      return;
+    }
+
+    if (patch.type === PATCH_TYPES.REPLACE) {
+      const targetBefore = getNodeByPathSafe(nextRoot, patch.path);
+      operations.push({
+        api: "replaceChild",
+        detail: `path ${formatPath(patch.path)}의 노드를 ${describeVNode(patch.newNode)}로 교체했습니다.`,
+      });
+      nextRoot = applyPatch(nextRoot, patch, container);
+      if (patch.path === "root") {
+        pushTouchedNode(touchedNodes, nextRoot);
+      } else {
+        const targetAfter = getNodeByPathSafe(nextRoot, patch.path);
+        pushTouchedNode(touchedNodes, targetAfter || targetBefore?.parentNode);
+      }
+      return;
+    }
+
+    if (patch.type === PATCH_TYPES.UPDATE_TEXT) {
+      const targetBefore = getNodeByPathSafe(nextRoot, patch.path);
+      operations.push({
+        api: "nodeValue",
+        detail: `path ${formatPath(patch.path)}의 텍스트를 ${JSON.stringify(
+          truncate(patch.newValue, 48)
+        )}로 변경했습니다.`,
+      });
+      nextRoot = applyPatch(nextRoot, patch, container);
+      pushTouchedNode(touchedNodes, targetBefore);
+      return;
+    }
+
+    if (patch.type === PATCH_TYPES.UPDATE_PROP) {
+      const targetBefore = getNodeByPathSafe(nextRoot, patch.path);
+      operations.push({
+        api: patch.newValue == null ? "removeAttribute" : "setAttribute",
+        detail:
+          patch.newValue == null
+            ? `path ${formatPath(patch.path)}에서 ${patch.key} 속성을 제거했습니다.`
+            : `path ${formatPath(patch.path)}의 ${patch.key} 속성을 ${JSON.stringify(
+                patch.newValue
+              )}로 설정했습니다.`,
+      });
+      nextRoot = applyPatch(nextRoot, patch, container);
+      pushTouchedNode(touchedNodes, targetBefore);
+    }
+  });
+
+  return {
+    root: nextRoot,
+    operations,
+    touchedNodes,
+  };
+}
+
+function serializeCurrentTestHtml() {
+  if (!state.testRoot) return "";
+
+  const currentVNode = sanitizeVNode(domToVNode(state.testRoot));
+  if (!currentVNode) return "";
+
+  const html = createRealNode(cloneVNode(currentVNode)).outerHTML;
+  return html;
+}
+
+function previewSourceInput() {
+  const applied = applySourceToTestHost();
+
+  if (!applied) {
+    return;
+  }
+
+  syncDerivedState();
+  renderAll();
+  setStatus("HTML 코드 편집 내용이 테스트 영역에 미리 반영되었습니다. Patch를 누르면 실제 영역에 적용됩니다.");
+  playPipeline(["read", "diff"]);
+}
+
+function applySourceToTestHost() {
+  const source = refs.htmlSource.value.trim();
+
+  if (!source) {
+    return false;
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = source;
+
+  const rootElements = [...template.content.children];
+
+  if (rootElements.length !== 1) {
+    setStatus("HTML 코드 편집은 루트 요소 1개만 허용합니다.");
+    return false;
+  }
+
+  const nextRoot = rootElements[0];
+
+  withInternalMutation(() => {
+    refs.testHost.replaceChildren();
+    decorateTestRoot(nextRoot);
+    refs.testHost.append(nextRoot);
+    state.testRoot = nextRoot;
+  });
+
+  clearSelectedNode();
+  return true;
 }
 
 
