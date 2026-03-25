@@ -555,8 +555,14 @@ button:disabled {
   align-items: baseline;
   padding: 8px 10px;
   border-radius: 14px;
+  border: 1px solid transparent;
   background: rgba(159, 184, 207, 0.05);
   padding-left: calc(10px + var(--depth, 0) * 16px);
+}
+
+.tree-row.is-highlighted {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
 .tree-kind {
