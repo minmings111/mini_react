@@ -339,8 +339,9 @@ button:disabled {
 .pipeline-card strong {
   display: inline-block;
   margin-top: 16px;
-  color: var(--lime);
+  color: #5f7340;
   font-size: 1.02rem;
+  font-weight: 800;
 }
 
 .lab-grid {
@@ -496,10 +497,11 @@ button:disabled {
   padding: 8px 12px;
   border-radius: 999px;
   background: rgba(116, 231, 255, 0.12);
-  color: var(--cyan);
+  color: #245d63;
   font-size: 0.78rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  font-weight: 800;
 }
 
 .scene-root h3 {
@@ -534,7 +536,7 @@ button:disabled {
 .scene-root .summary-grid strong {
   display: block;
   margin-bottom: 4px;
-  color: var(--lime);
+  color: #5a6d3b;
   font-size: 1.08rem;
   line-height: 1.2;
   overflow-wrap: anywhere;
@@ -558,7 +560,7 @@ button:disabled {
   padding: 6px 10px;
   border-radius: 999px;
   background: rgba(116, 231, 255, 0.1);
-  color: #dff8ff;
+  color: #25555b;
 }
 
 .scene-root .action-stack {
@@ -666,8 +668,13 @@ button:disabled {
 .history-button strong {
   display: block;
   margin-bottom: 4px;
-  color: #f3fbff;
+  color: #1f2d31;
   font-size: 0.95rem;
+}
+
+.event-item .history-meta,
+.history-button .history-meta {
+  color: #52696e;
 }
 
 .history-button {
@@ -677,6 +684,14 @@ button:disabled {
 .history-button.is-active {
   border-color: rgba(116, 231, 255, 0.38);
   background: rgba(116, 231, 255, 0.1);
+}
+
+.history-button.is-active strong {
+  color: #16353b;
+}
+
+.history-button.is-active .history-meta {
+  color: #476267;
 }
 
 @media (max-width: 1240px) {
